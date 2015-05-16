@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<definitions id="Definition"
+             targetNamespace="http://www.jboss.org/drools"
+             typeLanguage="http://www.java.com/javaTypes"
+             expressionLanguage="http://www.mvel.org/2.0"
+             xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://www.omg.org/spec/BPMN/20100524/MODEL BPMN20.xsd"
+             xmlns:g="http://www.jboss.org/drools/flow/gpd"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             xmlns:tns="http://www.jboss.org/drools">
+
+  <itemDefinition id="null" />
+
+  <process processType="Private" isExecutable="true" id="com.aricent.bpmn.process" name="Hello World" >
+
+    <extensionElements>
+     <tns:import name="java.util.*" />
+     <tns:import name="java.io.*" />
+     <tns:import name="java.util.Scanner" />
+     <tns:import name="com.aricent.process.EventTo" />
+     <tns:import name="java.io.*" />
+     <tns:import name="java.util.ArrayList" />
+     <tns:import name="java.util.Scanner" />
+     <tns:import name="org.kie.internal.io.ResourceFactory" />
+     <tns:import name="java.lang.Math" />
+     <tns:import name="java.text.DateFormat" />
+     <tns:import name="java.text.SimpleDateFormat" />
+     <tns:import name="java.util.Date" />
+     <tns:import name="java.io.InputStream" />
+     <tns:import name="org.kie.api.io.Resource" />
+     <tns:import name="com.sun.jersey.api.client.Client" />
+     <tns:import name="com.sun.jersey.api.client.ClientResponse" />
+     <tns:import name="com.sun.jersey.api.client.WebResource" />
+     <tns:import name="javax.xml.parsers.DocumentBuilder" />
+     <tns:import name="javax.xml.parsers.DocumentBuilderFactory" />
+     <tns:import name="org.w3c.dom.Document" />
+     <tns:import name="org.w3c.dom.Element" />
+     <tns:import name="org.w3c.dom.*" />
+     <tns:import name="org.xml.sax.InputSource" />
+    </extensionElements>
+    <!-- process variables -->
+    <property id="eventDetails" itemSubjectRef="null"/>
+    <property id="timestamp" itemSubjectRef="null"/>
+    <property id="notif_Type" itemSubjectRef="null"/>
+
+    <!-- nodes -->
+    <scriptTask id="_2" name="Read Events" scriptFormat="http://www.java.com/java" >
+      <script>	                
+	             String notifytype=(String)kcontext.getVariable("notifytype");
+	                 Client client = Client.create();
+					 
+					 System.out.println("Sending request to Server  to Device : "+notifytype);
+		             WebResource webResource = client
+							.resource("http://localhost:8000/EventWebservice/rest/eventServices/?devicename=getNotification&amp;count=2");
+
+					 ClientResponse response = webResource.accept("application/xml").get(ClientResponse.class);
+									
+							
+					 String output = response.getEntity(String.class);
+
+					System.out.println("Got Event Details from Server .... \n");
+					System.out.println(output);
+					
+					DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+					InputSource src = new InputSource();
+					src.setCharacterStream(new StringReader(output));
+
+					Document document = builder.parse(src);
+
+					 document.getDocumentElement().normalize();
+				
+					  NodeList nodeList = document.getElementsByTagName("Event");
+		
+
+					  ArrayList&lt;EventTo&gt; eventList = new ArrayList&lt;EventTo&gt;();
+					  EventTo event = new EventTo();
+                      int index = -1;
+					  for (int i = 0; i &lt; nodeList.getLength(); i++) {
+
+					    Node node = nodeList.item(i);
+
+			  if (node.getNodeType() == Node.ELEMENT_NODE) {
+		  
+		      Element eventElmnt = (Element) node;
+		      NodeList eventIdElmntLst = eventElmnt.getElementsByTagName("eventId");
+		      Element eventIdElmnt = (Element) eventIdElmntLst.item(0);
+		      NodeList eventIdNode = eventIdElmnt.getChildNodes();
+		      
+		      index++;
+              event = new EventTo();
+			  event.setEventId(((Node) eventIdNode.item(0)).getNodeValue());
+              eventList.add(index, event);
+
+		
+		      NodeList tempElmntLst = eventElmnt.getElementsByTagName("temperature");
+		      Element tempNmElmnt = (Element) tempElmntLst.item(0);
+		      NodeList tempNm = tempNmElmnt.getChildNodes();
+		               
+			  String temperature=((Node) tempNm.item(0)).getNodeValue();
+		       event.setTemperature(Integer.parseInt(temperature));
+		       eventList.set(index, event);
+			
+		      NodeList timestampElmntLst = eventElmnt.getElementsByTagName("timestamp");
+		      Element timestampElmnt = (Element) timestampElmntLst.item(0);
+		      NodeList timestampNm1 = timestampElmnt.getChildNodes();
+			  
+			   event.setTimeStamp(((Node) timestampNm1.item(0)).getNodeValue());
+               eventList.set(i, event);
+		    }
+		               kcontext.setVariable("eventDetails", eventList);
+
+					  }
+					
+</script>
+    </scriptTask>
+    <startEvent id="_1"  isInterrupting="true"/>
+    <scriptTask id="_jbpm-unique-26" name="Compare  Event Temperature" scriptFormat="http://www.java.com/java" >
+      <script>ArrayList&lt;EventTo&gt;events= (ArrayList&lt;EventTo&gt;)kcontext.getVariable("eventDetails");
+long diffInMillis =0;
+
+  System.out.println("Comparing Event Temperature based on Timestamp");
+  
+// Added only for 2 events.. 
+if(events!=null &amp;&amp; events.size()==2){
+
+ if(events.get(0).getTemperature()&lt;events.get(1).getTemperature()){
+String event1TimeStamp=events.get(0).getTimeStamp();
+String event2TimeStamp=events.get(1).getTimeStamp();
+DateFormat formatter = null;
+formatter = new SimpleDateFormat("yyyy-dd-MM HH:mm:ss");
+Date date1 = (Date) formatter.parse(event1TimeStamp);
+Date date2 = (Date) formatter.parse(event2TimeStamp);
+
+diffInMillis = Math.abs(date1.getTime() - date2.getTime());
+}
+}
+
+kcontext.setVariable("timestamp",diffInMillis);
+</script>
+    </scriptTask>
+    <exclusiveGateway id="_jbpm-unique-28" name="Gateway" gatewayDirection="Diverging" />
+    <scriptTask id="_jbpm-unique-29" name="Emergency Notification" >
+      <script>System.out.println("Event Temperature increased");
+
+System.out.println("Emergency Notification raised");
+
+kcontext.setVariable("notif_Type","Emergency");</script>
+    </scriptTask>
+    <scriptTask id="_jbpm-unique-30" name="Maintainence Notification" >
+      <script>System.out.println("Maintainence Notification raised");
+
+kcontext.setVariable("notif_Type","Maintainence");</script>
+    </scriptTask>
+    <scriptTask id="_jbpm-unique-2" name="Write Logger" scriptFormat="http://www.java.com/java" >
+      <script>try {
+ 
+           String notification=(String)kcontext.getVariable("notif_Type");
+		   String content = "Notification Received ";
+			if(notification!=null &amp;&amp; notif_Type.equals("Emergency")){
+			  content= "Emergency Notification Received ";
+			}
+			else if(notification!=null &amp;&amp; notif_Type.equals("Maintainence")){
+			content= "Maintainence Notification Received ";
+			}
+			Date date = new Date();
+ 
+			File file = new File("event.log");
+ 
+			// if file doesnt exists, then create it
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+ 
+			FileWriter fw = new FileWriter(file.getAbsoluteFile(),true);
+			BufferedWriter bw = new BufferedWriter(fw);
+			bw.newLine();
+			content= content+date;
+			bw.write(content);
+			bw.close();
+ 
+ 
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+</script>
+    </scriptTask>
+    <exclusiveGateway id="_jbpm-unique-5" name="Gateway" gatewayDirection="Converging" />
+    <endEvent id="_jbpm-unique-3" name="End" >
+        <terminateEventDefinition />
+    </endEvent>
+    <scriptTask id="_jbpm-unique-8" name="Maintainence Notification" >
+      <script></script>
+    </scriptTask>
+
+    <!-- connections -->
+    <sequenceFlow id="_1-_2" sourceRef="_1" targetRef="_2" />
+    <sequenceFlow id="_2-_jbpm-unique-26" sourceRef="_2" targetRef="_jbpm-unique-26" />
+    <sequenceFlow id="_jbpm-unique-26-_jbpm-unique-28" sourceRef="_jbpm-unique-26" targetRef="_jbpm-unique-28" />
+    <sequenceFlow id="_jbpm-unique-28-_jbpm-unique-29" sourceRef="_jbpm-unique-28" targetRef="_jbpm-unique-29" name="Temp increased" tns:priority="1" >
+      <conditionExpression xsi:type="tFormalExpression" >return timestamp &gt; 15*60*1000;</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="_jbpm-unique-28-_jbpm-unique-30" sourceRef="_jbpm-unique-28" targetRef="_jbpm-unique-30" name="Temp Not increased" tns:priority="1" >
+      <conditionExpression xsi:type="tFormalExpression" >return timestamp &lt; 15*60*1000</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="_jbpm-unique-5-_jbpm-unique-2" sourceRef="_jbpm-unique-5" targetRef="_jbpm-unique-2" />
+    <sequenceFlow id="_jbpm-unique-30-_jbpm-unique-5" sourceRef="_jbpm-unique-30" targetRef="_jbpm-unique-5" />
+    <sequenceFlow id="_jbpm-unique-8-_jbpm-unique-5" sourceRef="_jbpm-unique-8" targetRef="_jbpm-unique-5" />
+    <sequenceFlow id="_jbpm-unique-2-_jbpm-unique-3" sourceRef="_jbpm-unique-2" targetRef="_jbpm-unique-3" />
+    <sequenceFlow id="_jbpm-unique-29-_jbpm-unique-8" sourceRef="_jbpm-unique-29" targetRef="_jbpm-unique-8" />
+
+  </process>
+
+  <bpmndi:BPMNDiagram>
+    <bpmndi:BPMNPlane bpmnElement="com.aricent.bpmn.process" >
+      <bpmndi:BPMNShape bpmnElement="_2" >
+        <dc:Bounds x="136" y="16" width="126" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_1" >
+        <dc:Bounds x="24" y="16" width="48" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-26" >
+        <dc:Bounds x="353" y="19" width="220" height="49" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-28" >
+        <dc:Bounds x="442" y="157" width="48" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-29" >
+        <dc:Bounds x="196" y="300" width="181" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-30" >
+        <dc:Bounds x="533" y="291" width="182" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-2" >
+        <dc:Bounds x="526" y="616" width="199" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-5" >
+        <dc:Bounds x="600" y="476" width="48" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-3" >
+        <dc:Bounds x="603" y="756" width="48" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape bpmnElement="_jbpm-unique-8" >
+        <dc:Bounds x="189" y="477" width="193" height="48" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge bpmnElement="_1-_2" >
+        <di:waypoint x="48" y="40" />
+        <di:waypoint x="199" y="40" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_2-_jbpm-unique-26" >
+        <di:waypoint x="199" y="40" />
+        <di:waypoint x="463" y="43" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-26-_jbpm-unique-28" >
+        <di:waypoint x="463" y="43" />
+        <di:waypoint x="466" y="181" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-28-_jbpm-unique-29" >
+        <di:waypoint x="466" y="181" />
+        <di:waypoint x="286" y="324" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-28-_jbpm-unique-30" >
+        <di:waypoint x="466" y="181" />
+        <di:waypoint x="624" y="315" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-5-_jbpm-unique-2" >
+        <di:waypoint x="624" y="500" />
+        <di:waypoint x="625" y="640" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-30-_jbpm-unique-5" >
+        <di:waypoint x="624" y="315" />
+        <di:waypoint x="624" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-8-_jbpm-unique-5" >
+        <di:waypoint x="285" y="501" />
+        <di:waypoint x="624" y="500" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-2-_jbpm-unique-3" >
+        <di:waypoint x="625" y="640" />
+        <di:waypoint x="627" y="780" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge bpmnElement="_jbpm-unique-29-_jbpm-unique-8" >
+        <di:waypoint x="286" y="324" />
+        <di:waypoint x="285" y="501" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</definitions>

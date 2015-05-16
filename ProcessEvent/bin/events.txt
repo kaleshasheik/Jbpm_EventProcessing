@@ -1,0 +1,9 @@
+EventId Event_1
+Temperature    60
+Timestamp  2009-09-22 16:00:08
+
+
+EventId Event_2
+Temperature    541
+Timestamp  2009-09-22 16:30:08
+
